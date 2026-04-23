@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>مولد أرقام - مع خاصية القص (Cut)</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: system-ui, 'Segoe UI', 'Tahoma', sans-serif;
+        }
+        body {
+            background: linear-gradient(145deg, #1a2a3a 0%, #0f1a24 100%);
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .card {
+            max-width: 1300px;
+            width: 100%;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(12px);
+            border-radius: 56px;
+            padding: 20px 24px 32px;
+            box-shadow: 0 25px 45px rgba(0,0,0,0.3);
+        }
+        h1 {
+            font-size: 1.7rem;
+            text-align: center;
+            color: #fff3e0;
+            margin: 0 0 8px;
+        }
+        .sub {
+            text-align: center;
+            color: #cfead9;
+            margin-bottom: 24px;
+            font-size: 0.85rem;
+        }
+        .stats {
+            background: #00000055;
+            border-radius: 60px;
+            padding: 12px 20px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            margin-bottom: 28px;
+            color: #f0f9ff;
+            font-weight: bold;
+        }
+        .stat-box {
+            background: #0a1118aa;
+            padding: 6px 18px;
+            border-radius: 40px;
+        }
+        .stat-box span {
+            color: #ffd966;
+            font-size: 1.3rem;
+            font-weight: 800;
+            margin-left: 8px;
+        }
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+        button {
+            background: #2c3e2f;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 60px;
+            font-size: 1rem;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        button#generateBtn {
+            background: #1f6d49;
+            box-shadow: 0 0 12px #2ecc71aa;
+        }
+        button#resetBtn {
+            background: #7a4c2c;
+        }
+        button#clearAllBtn {
+            background: #962d3e;
+        }
+        .numbers-container {
+            background: #0d1b1fe6;
+            border-radius: 32px;
+            padding: 18px 12px;
+            max-height: 55vh;
+            overflow-y: auto;
+        }
+        .grid-numbers {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, auto));
+            gap: 12px;
+            justify-content: center;
+        }
+        .number-card {
+            background: #fef9e6;
+            color: #1f3b2c;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 1.1rem;
+            text-align: center;
+            padding: 8px 6px;
+            border-radius: 28px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            padding-left: 12px;
+            padding-right: 12px;
+            direction: ltr;
+        }
+        .number-text {
+            flex: 1;
+            font-size: 1.2rem;
+            letter-spacing: 1px;
+        }
+        .cut-btn {
+            background: #c0392b;
+            border: none;
+            color: white;
+            font-weight: bold;
+            font-size: 0.75rem;
+            padding: 4px 10px;
+            border-radius: 40px;
+            cursor: pointer;
+            transition: 0.1s;
+            min-width: 50px;
+        }
+        .cut-btn:active {
+            transform: scale(0.92);
+        }
+        @media (max-width: 600px) {
+            .grid-numbers {
+                grid-template-columns: repeat(auto-fill, minmax(110px, auto));
+            }
+            .number-text {
+                font-size: 0.9rem;
+            }
+            .cut-btn {
+                font-size: 0.65rem;
+                padding: 3px 8px;
+            }
+        }
+        .footer-note {
+            font-size: 0.7rem;
+            text-align: center;
+            margin-top: 20px;
+            color: #bcd0c2;
+        }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h1>✂️ مولد الأرقام + خاصية القص (Cut)</h1>
+    <div class="sub">5 مراتب | بدون تكرار | قص أي رقم يختفي نهائيًا</div>
+
+    <div class="stats">
+        <div class="stat-box">📦 المتبقي: <span id="countDisplay">0</span></div>
+        <div class="stat-box">🎯 الهدف: <span>2000</span></div>
+        <div class="stat-box">✂️ اضغط "قص" لحذف الرقم</div>
+    </div>
+
+    <div class="button-group">
+        <button id="generateBtn">🚀 توليد حتى 2000</button>
+        <button id="resetBtn">🔄 إعادة ضبط كامل</button>
+        <button id="clearAllBtn">🗑️ حذف الكل</button>
+    </div>
+
+    <div class="numbers-container">
+        <div id="numbersList" class="grid-numbers"></div>
+    </div>
+    <div class="footer-note">
+        💾 حفظ في IndexedDB | أي رقم تقصّه يُحذف من الذاكرة نهائيًا ولن يظهر مجددًا إلا إذا أعدت الضبط الكامل.
+    </div>
+</div>
+
+<script>
+    (function() {
+        // ------------------- الشروط نفسها -------------------
+        function isValidNumber(num) {
+            const s = num.toString();
+            if (s.length !== 5) return false;
+            for (let i = 0; i < s.length - 1; i++) if (s[i] === s[i+1]) return false;
+            for (let i = 0; i < s.length - 2; i++) if (s[i] === s[i+1] && s[i+1] === s[i+2]) return false;
+            for (let i = 0; i < s.length - 2; i++) {
+                const a = parseInt(s[i],10), b = parseInt(s[i+1],10), c = parseInt(s[i+2],10);
+                if ((b === a+1 && c === b+1) || (b === a-1 && c === b-1)) return false;
+            }
+            return true;
+        }
+
+        function randomFiveDigit() {
+            return Math.floor(Math.random() * (99999 - 10000 + 1) + 10000);
+        }
+
+        function generateValidRandom(blacklistSet) {
+            let attempts = 0;
+            while (attempts < 600) {
+                const candidate = randomFiveDigit();
+                if (isValidNumber(candidate) && !blacklistSet.has(candidate)) return candidate;
+                attempts++;
+            }
+            for (let i = 10000; i <= 99999; i++) {
+                if (isValidNumber(i) && !blacklistSet.has(i)) return i;
+            }
+            return null;
+        }
+
+        // ------------------- IndexedDB -------------------
+        const DB_NAME = 'UniqueCutDB';
+        const STORE_NAME = 'numbersStore';
+        const KEY_NAME = 'mainList';
+
+        let db = null;
+
+        function openDB() {
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open(DB_NAME, 3);
+                req.onerror = () => reject(req.error);
+                req.onsuccess = () => { db = req.result; resolve(db); };
+                req.onupgradeneeded = (e) => {
+                    const dbRef = e.target.result;
+                    if (!dbRef.objectStoreNames.contains(STORE_NAME)) {
+                        dbRef.createObjectStore(STORE_NAME);
+                    }
+                };
+            });
+        }
+
+        async function saveNumbers(arr) {
+            if (!db) await openDB();
+            return new Promise((res, rej) => {
+                const tx = db.transaction([STORE_NAME], 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                const req = store.put(arr, KEY_NAME);
+                req.onsuccess = () => res();
+                req.onerror = () => rej(req.error);
+            });
+        }
+
+        async function loadNumbers() {
+            if (!db) await openDB();
+            return new Promise((res) => {
+                const tx = db.transaction([STORE_NAME], 'readonly');
+                const store = tx.objectStore(STORE_NAME);
+                const req = store.get(KEY_NAME);
+                req.onsuccess = () => res(Array.isArray(req.result) ? req.result : []);
+                req.onerror = () => res([]);
+            });
+        }
+
+        async function clearNumbers() {
+            if (!db) await openDB();
+            return new Promise((res, rej) => {
+                const tx = db.transaction([STORE_NAME], 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                const req = store.delete(KEY_NAME);
+                req.onsuccess = () => res();
+                req.onerror = () => rej(req.error);
+            });
+        }
+
+        // ------------------- حذف رقم معين (القص) -------------------
+        async function cutNumber(numToCut) {
+            let current = await loadNumbers();
+            if (!current.includes(numToCut)) return false;
+            const newList = current.filter(n => n !== numToCut);
+            await saveNumbers(newList);
+            renderNumbers(newList);
+            return true;
+        }
+
+        // ------------------- توليد أرقام جديدة حتى اكتمال العدد -------------------
+        async function generateUpToTarget(target = 2000) {
+            let current = await loadNumbers();
+            if (current.length >= target) {
+                renderNumbers(current.slice(0,target));
+                alert(`✅ لديك بالفعل ${current.length} رقم. لا حاجة للتوليد.`);
+                return;
+            }
+
+            const needed = target - current.length;
+            const existingSet = new Set(current);
+            const newNumbers = [];
+            let failsafe = 0;
+
+            while (newNumbers.length < needed && failsafe < 8000) {
+                const cand = generateValidRandom(existingSet);
+                if (cand && !existingSet.has(cand)) {
+                    existingSet.add(cand);
+                    newNumbers.push(cand);
+                } else if (cand === null) break;
+                failsafe++;
+            }
+
+            const allNumbers = [...current, ...newNumbers];
+            await saveNumbers(allNumbers);
+            renderNumbers(allNumbers);
+            if (allNumbers.length < target) {
+                alert(`⚠️ تم توليد ${allNumbers.length} رقم فقط (نفذت الأرقام الصالحة). يمكنك قص بعضها ثم التوليد مجددًا.`);
+            } else {
+                alert(`🎉 اكتمل ${allNumbers.length} رقمًا! استخدم "قص" لحذف أي رقم.`);
+            }
+        }
+
+        // عرض مع أزرار القص
+        function renderNumbers(numbersArray) {
+            const container = document.getElementById('numbersList');
+            const countSpan = document.getElementById('countDisplay');
+            countSpan.innerText = numbersArray.length;
+
+            if (!numbersArray.length) {
+                container.innerHTML = `<div style="color:#ccc; text-align:center; grid-column:1/-1;">📭 لا توجد أرقام. اضغط "توليد"</div>`;
+                return;
+            }
+
+            const fragment = document.createDocumentFragment();
+            numbersArray.forEach(num => {
+                const div = document.createElement('div');
+                div.className = 'number-card';
+                const spanNum = document.createElement('span');
+                spanNum.className = 'number-text';
+                spanNum.textContent = num;
+                const cutBtn = document.createElement('button');
+                cutBtn.textContent = '✂️ قص';
+                cutBtn.className = 'cut-btn';
+                cutBtn.onclick = async (e) => {
+                    e.stopPropagation();
+                    if (confirm(`هل تريد قص الرقم ${num} نهائيًا؟`)) {
+                        await cutNumber(num);
+                    }
+                };
+                div.appendChild(spanNum);
+                div.appendChild(cutBtn);
+                fragment.appendChild(div);
+            });
+            container.innerHTML = '';
+            container.appendChild(fragment);
+        }
+
+        async function fullReset() {
+            if (confirm('⚠️ سيتم مسح كل الأرقام (بما فيها المقصوصة سابقًا). متابعة؟')) {
+                await clearNumbers();
+                renderNumbers([]);
+                alert('تم مسح الذاكرة بالكامل.');
+            }
+        }
+
+        async function regenerateFresh() {
+            if (confirm('🔄 سيتم مسح الحالي وتوليد 2000 جديد من الصفر؟')) {
+                await clearNumbers();
+                await generateUpToTarget(2000);
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            await openDB();
+            const saved = await loadNumbers();
+            renderNumbers(saved);
+            document.getElementById('generateBtn').addEventListener('click', () => generateUpToTarget(2000));
+            document.getElementById('resetBtn').addEventListener('click', regenerateFresh);
+            document.getElementById('clearAllBtn').addEventListener('click', fullReset);
+        });
+    })();
+</script>
+</body>
+</html>
