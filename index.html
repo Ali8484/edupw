@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>مولد أرقام - مع خاصية القص (Cut)</title>
+    <title>مولد أرقام - مع خاصية القص (Cut) + استثناءات</title>
     <style>
         * {
             box-sizing: border-box;
@@ -157,6 +157,15 @@
             margin-top: 20px;
             color: #bcd0c2;
         }
+        .blacklist-note {
+            background: #2c1a1a;
+            padding: 6px 12px;
+            border-radius: 30px;
+            font-size: 0.7rem;
+            text-align: center;
+            margin-top: 12px;
+            color: #ffaeae;
+        }
     </style>
 </head>
 <body>
@@ -182,13 +191,23 @@
     <div class="footer-note">
         💾 حفظ في IndexedDB | أي رقم تقصّه يُحذف من الذاكرة نهائيًا ولن يظهر مجددًا إلا إذا أعدت الضبط الكامل.
     </div>
+    <div class="blacklist-note">
+        🚫 الأرقام المستثناة (لن تُولد أبدًا): 12896, 09030, 43523, 42015, 41807, 57439, 58640
+    </div>
 </div>
 
 <script>
     (function() {
+        // ------------------- الأرقام المستثناة (سوداء) -------------------
+        const BLACKLIST = new Set([12896, 9030, 43523, 42015, 41807, 57439, 58640]);
+        // ملاحظة: 09030 يُخزَّن كـ 9030 لأن الرقم 5 مراتب لا يبدأ بصفر حقيقي، لكن 09030 = 9030
+
         // ------------------- الشروط نفسها -------------------
         function isValidNumber(num) {
-            const s = num.toString();
+            // استثناء الأرقام المحظورة
+            if (BLACKLIST.has(num)) return false;
+
+            const s = num.toString().padStart(5, '0'); // للتأكد من 5 خانات
             if (s.length !== 5) return false;
             for (let i = 0; i < s.length - 1; i++) if (s[i] === s[i+1]) return false;
             for (let i = 0; i < s.length - 2; i++) if (s[i] === s[i+1] && s[i+1] === s[i+2]) return false;
@@ -205,11 +224,12 @@
 
         function generateValidRandom(blacklistSet) {
             let attempts = 0;
-            while (attempts < 600) {
+            while (attempts < 800) {
                 const candidate = randomFiveDigit();
                 if (isValidNumber(candidate) && !blacklistSet.has(candidate)) return candidate;
                 attempts++;
             }
+            // مسح خطي أمان
             for (let i = 10000; i <= 99999; i++) {
                 if (isValidNumber(i) && !blacklistSet.has(i)) return i;
             }
@@ -217,7 +237,7 @@
         }
 
         // ------------------- IndexedDB -------------------
-        const DB_NAME = 'UniqueCutDB';
+        const DB_NAME = 'UniqueCutDB_v2';
         const STORE_NAME = 'numbersStore';
         const KEY_NAME = 'mainList';
 
@@ -225,7 +245,7 @@
 
         function openDB() {
             return new Promise((resolve, reject) => {
-                const req = indexedDB.open(DB_NAME, 3);
+                const req = indexedDB.open(DB_NAME, 4);
                 req.onerror = () => reject(req.error);
                 req.onsuccess = () => { db = req.result; resolve(db); };
                 req.onupgradeneeded = (e) => {
@@ -254,7 +274,17 @@
                 const tx = db.transaction([STORE_NAME], 'readonly');
                 const store = tx.objectStore(STORE_NAME);
                 const req = store.get(KEY_NAME);
-                req.onsuccess = () => res(Array.isArray(req.result) ? req.result : []);
+                req.onsuccess = () => {
+                    let data = req.result;
+                    if (Array.isArray(data)) {
+                        // فلترة الأرقام المحظورة في حال وجودها قديمًا
+                        const filtered = data.filter(n => !BLACKLIST.has(n));
+                        if (filtered.length !== data.length) saveNumbers(filtered);
+                        res(filtered);
+                    } else {
+                        res([]);
+                    }
+                };
                 req.onerror = () => res([]);
             });
         }
@@ -272,6 +302,10 @@
 
         // ------------------- حذف رقم معين (القص) -------------------
         async function cutNumber(numToCut) {
+            if (BLACKLIST.has(numToCut)) {
+                alert(`⚠️ الرقم ${numToCut} محظور ولا يمكن إضافته أصلاً.`);
+                return false;
+            }
             let current = await loadNumbers();
             if (!current.includes(numToCut)) return false;
             const newList = current.filter(n => n !== numToCut);
@@ -280,7 +314,7 @@
             return true;
         }
 
-        // ------------------- توليد أرقام جديدة حتى اكتمال العدد -------------------
+        // ------------------- توليد أرقام جديدة -------------------
         async function generateUpToTarget(target = 2000) {
             let current = await loadNumbers();
             if (current.length >= target) {
@@ -294,9 +328,9 @@
             const newNumbers = [];
             let failsafe = 0;
 
-            while (newNumbers.length < needed && failsafe < 8000) {
+            while (newNumbers.length < needed && failsafe < 10000) {
                 const cand = generateValidRandom(existingSet);
-                if (cand && !existingSet.has(cand)) {
+                if (cand && !existingSet.has(cand) && !BLACKLIST.has(cand)) {
                     existingSet.add(cand);
                     newNumbers.push(cand);
                 } else if (cand === null) break;
@@ -307,7 +341,7 @@
             await saveNumbers(allNumbers);
             renderNumbers(allNumbers);
             if (allNumbers.length < target) {
-                alert(`⚠️ تم توليد ${allNumbers.length} رقم فقط (نفذت الأرقام الصالحة). يمكنك قص بعضها ثم التوليد مجددًا.`);
+                alert(`⚠️ تم توليد ${allNumbers.length} رقم فقط (نفذت الأرقام الصالحة غير المحظورة). يمكنك قص بعضها ثم التوليد مجددًا.`);
             } else {
                 alert(`🎉 اكتمل ${allNumbers.length} رقمًا! استخدم "قص" لحذف أي رقم.`);
             }
@@ -330,13 +364,14 @@
                 div.className = 'number-card';
                 const spanNum = document.createElement('span');
                 spanNum.className = 'number-text';
-                spanNum.textContent = num;
+                // عرض الرقم بـ 5 خانات مع صفر أيسر إذا لزم
+                spanNum.textContent = num.toString().padStart(5, '0');
                 const cutBtn = document.createElement('button');
                 cutBtn.textContent = '✂️ قص';
                 cutBtn.className = 'cut-btn';
                 cutBtn.onclick = async (e) => {
                     e.stopPropagation();
-                    if (confirm(`هل تريد قص الرقم ${num} نهائيًا؟`)) {
+                    if (confirm(`هل تريد قص الرقم ${num.toString().padStart(5, '0')} نهائيًا؟`)) {
                         await cutNumber(num);
                     }
                 };
@@ -357,7 +392,7 @@
         }
 
         async function regenerateFresh() {
-            if (confirm('🔄 سيتم مسح الحالي وتوليد 2000 جديد من الصفر؟')) {
+            if (confirm('🔄 سيتم مسح الحالي وتوليد 2000 جديد من الصفر (مع استثناء الأرقام المحظورة)؟')) {
                 await clearNumbers();
                 await generateUpToTarget(2000);
             }
